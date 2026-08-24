@@ -1,0 +1,28 @@
+{
+  "_description": "Example roster override file (PRD.md section 6.2). Copy this to config/roster_overrides.json (gitignored) and edit it for a specific prediction date. Each entry adjusts one player's active-roster status for that date only.",
+  "prediction_date": "2026-01-15",
+  "overrides": [
+    {
+      "player_id": 3945274,
+      "player_name": "Example Player A",
+      "team_id": 1610612738,
+      "status": "out",
+      "note": "same-day injury, not yet reflected in trailing rolling stats"
+    },
+    {
+      "player_id": 4066648,
+      "player_name": "Example Player B",
+      "team_id": 1610612747,
+      "status": "in",
+      "note": "returning from injury, fewer trailing-window games than the automatic default would use"
+    },
+    {
+      "player_id": 3136776,
+      "player_name": "Example Player C",
+      "team_id": 1610612738,
+      "status": "reassigned",
+      "new_team_id": 1610612744,
+      "note": "trade completed, not yet reflected in player_box team_id"
+    }
+  ]
+}

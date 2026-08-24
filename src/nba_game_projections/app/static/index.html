@@ -1,0 +1,577 @@
+<title>NBA Game Projections</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #2a2e38;
+    --text: #e6e8eb;
+    --muted: #8b93a3;
+    --accent: #4f8cff;
+    --good: #3ddc84;
+    --bad: #ff6161;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1.25rem;
+  }
+  nav {
+    display: flex;
+    gap: 0.5rem;
+  }
+  nav button {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  nav button.active {
+    color: var(--text);
+    border-color: var(--accent);
+    background: rgba(79, 140, 255, 0.12);
+  }
+  main {
+    padding: 1.5rem;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+  section { display: none; }
+  section.active { display: block; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+  }
+  .panel h2 {
+    margin-top: 0;
+    font-size: 1rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+  input, select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.45rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+  }
+  button.action {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button.action:disabled { opacity: 0.5; cursor: default; }
+  button.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  button.danger { border-color: var(--bad); color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; }
+  .badge {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+  .badge.win { background: rgba(61, 220, 132, 0.15); color: var(--good); }
+  .badge.lose { background: rgba(255, 97, 97, 0.12); color: var(--bad); }
+  .badge.active { background: rgba(61, 220, 132, 0.15); color: var(--good); }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .status-line { margin-top: 0.75rem; font-size: 0.85rem; color: var(--muted); white-space: pre-wrap; }
+  form.override-form { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-top: 0.5rem; }
+  form.override-form label { font-size: 0.8rem; color: var(--muted); display: block; margin-bottom: 0.2rem; }
+  form.override-form .full { grid-column: 1 / -1; }
+</style>
+
+<header>
+  <h1>NBA Game Projections</h1>
+  <nav>
+    <button data-tab="slate" class="active">Slate</button>
+    <button data-tab="overrides">Roster Overrides</button>
+    <button data-tab="models">Models</button>
+    <button data-tab="tracking">Tracking</button>
+    <button data-tab="admin">Admin</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-slate" class="active">
+    <div class="panel">
+      <h2>Predicted Slate</h2>
+      <div class="row">
+        <input type="date" id="slate-date" />
+        <button class="action" id="slate-load">Load Slate</button>
+      </div>
+      <div class="status-line" id="slate-status"></div>
+      <table id="slate-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Away</th>
+            <th>Home</th>
+            <th>Predicted margin</th>
+            <th>Predicted winner</th>
+            <th>Home win prob.</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-overrides">
+    <div class="panel">
+      <h2>Current Overrides</h2>
+      <table id="overrides-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Team</th>
+            <th>Status</th>
+            <th>New team</th>
+            <th>Note</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="status-line" id="overrides-status"></div>
+    </div>
+    <div class="panel">
+      <h2>Add / Update Override</h2>
+      <p class="muted">Posting with an existing player id updates that player's row.</p>
+      <form class="override-form" id="override-form">
+        <div>
+          <label>Player ID</label>
+          <input type="number" id="ov-player-id" required />
+        </div>
+        <div>
+          <label>Player name</label>
+          <input type="text" id="ov-player-name" required />
+        </div>
+        <div>
+          <label>Team ID</label>
+          <input type="number" id="ov-team-id" required />
+        </div>
+        <div>
+          <label>Status</label>
+          <select id="ov-status">
+            <option value="out">out</option>
+            <option value="in">in</option>
+            <option value="reassigned">reassigned</option>
+          </select>
+        </div>
+        <div>
+          <label>New team ID (reassigned only)</label>
+          <input type="number" id="ov-new-team-id" />
+        </div>
+        <div>
+          <label>Note</label>
+          <input type="text" id="ov-note" />
+        </div>
+        <div class="full row">
+          <button class="action" type="submit">Save Override</button>
+          <span class="status-line" id="override-form-status"></span>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section id="tab-models">
+    <div class="panel">
+      <h2>Model Versions</h2>
+      <div class="row">
+        <button class="secondary" id="models-refresh">Refresh</button>
+      </div>
+      <table id="models-table" style="display:none">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Through date</th>
+            <th>Created</th>
+            <th>Active</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <div class="status-line" id="models-status"></div>
+    </div>
+  </section>
+
+  <section id="tab-tracking">
+    <div class="panel">
+      <h2>Capture / Reconcile</h2>
+      <p class="muted">
+        Capture upserts a prediction for every not-yet-played game in the next 14 days (never
+        touches an already-reconciled row). Reconcile fills in actual results for pending
+        predictions whose game is complete in the locally cached data - run Refresh Data first
+        to pick up anything that finished since your last pull.
+      </p>
+      <div class="row">
+        <button class="action" id="capture-predictions">Capture Predictions</button>
+        <button class="action" id="reconcile-predictions">Reconcile Predictions</button>
+      </div>
+      <div class="status-line" id="tracking-status"></div>
+    </div>
+    <div class="panel">
+      <h2>Accuracy</h2>
+      <div class="row">
+        <button class="secondary" id="accuracy-refresh">Refresh</button>
+      </div>
+      <div class="status-line" id="accuracy-status"></div>
+      <table id="accuracy-table" style="display:none">
+        <thead>
+          <tr>
+            <th>Model version</th>
+            <th>Games</th>
+            <th>Win/loss accuracy</th>
+            <th>Margin MAE</th>
+            <th>Margin RMSE</th>
+            <th>Brier score</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-admin">
+    <div class="panel">
+      <h2>Refresh Data</h2>
+      <p class="muted">Downloads current-season hoopR files not already cached. Fast.</p>
+      <button class="action" id="refresh-data">Refresh Data</button>
+      <div class="status-line" id="refresh-status"></div>
+    </div>
+    <div class="panel">
+      <h2>Retrain Model</h2>
+      <p class="muted">Full production retrain runs in the background and can take ~an hour.</p>
+      <button class="action" id="start-retrain">Start Retrain</button>
+      <div class="status-line" id="retrain-status"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  document.querySelectorAll("nav button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("nav button").forEach((b) => b.classList.remove("active"));
+      document.querySelectorAll("main section").forEach((s) => s.classList.remove("active"));
+      btn.classList.add("active");
+      el(`tab-${btn.dataset.tab}`).classList.add("active");
+    });
+  });
+
+  async function api(path, options) {
+    const response = await fetch(path, options);
+    const body = await response.json().catch(() => null);
+    if (!response.ok) {
+      const detail = body && body.detail ? body.detail : response.statusText;
+      throw new Error(detail);
+    }
+    return body;
+  }
+
+  // --- Slate ---
+  el("slate-date").valueAsDate = new Date();
+
+  function pct(p) {
+    return `${(p * 100).toFixed(1)}%`;
+  }
+
+  async function loadSlate() {
+    const table = el("slate-table");
+    const status = el("slate-status");
+    const tbody = table.querySelector("tbody");
+    const date = el("slate-date").value;
+    status.textContent = "Loading...";
+    table.style.display = "none";
+    tbody.innerHTML = "";
+    try {
+      const games = await api(`/predictions/slate?date=${date}`);
+      if (games.length === 0) {
+        status.textContent = "No games scheduled on this date.";
+        return;
+      }
+      for (const game of games) {
+        const tr = document.createElement("tr");
+        const homeWins = game.predicted_winner === "home";
+        tr.innerHTML = `
+          <td>${game.away_team_name ?? game.away_team_id}</td>
+          <td>${game.home_team_name ?? game.home_team_id}</td>
+          <td>${game.predicted_margin.toFixed(1)}</td>
+          <td><span class="badge ${homeWins ? "win" : "lose"}">${homeWins ? "Home" : "Away"}</span></td>
+          <td>${pct(game.home_win_probability)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      status.textContent = "";
+      table.style.display = "table";
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  }
+  el("slate-load").addEventListener("click", loadSlate);
+
+  // --- Roster overrides ---
+  async function loadOverrides() {
+    const table = el("overrides-table");
+    const status = el("overrides-status");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+    try {
+      const overrides = await api("/admin/roster-overrides");
+      if (overrides.length === 0) {
+        status.textContent = "No overrides set.";
+        table.style.display = "none";
+        return;
+      }
+      for (const o of overrides) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${o.player_name} <span class="muted">(#${o.player_id})</span></td>
+          <td>${o.team_id}</td>
+          <td>${o.status}</td>
+          <td>${o.new_team_id ?? ""}</td>
+          <td>${o.note ?? ""}</td>
+          <td><button class="secondary danger" data-id="${o.id}">Remove</button></td>
+        `;
+        tr.querySelector("button").addEventListener("click", () => removeOverride(o.id));
+        tbody.appendChild(tr);
+      }
+      status.textContent = "";
+      table.style.display = "table";
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function removeOverride(id) {
+    try {
+      await api(`/admin/roster-overrides/${id}`, { method: "DELETE" });
+      loadOverrides();
+    } catch (err) {
+      el("overrides-status").textContent = `Error: ${err.message}`;
+    }
+  }
+
+  el("override-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const formStatus = el("override-form-status");
+    const payload = {
+      player_id: Number(el("ov-player-id").value),
+      player_name: el("ov-player-name").value,
+      team_id: Number(el("ov-team-id").value),
+      status: el("ov-status").value,
+      new_team_id: el("ov-new-team-id").value ? Number(el("ov-new-team-id").value) : null,
+      note: el("ov-note").value || null,
+    };
+    formStatus.textContent = "Saving...";
+    try {
+      await api("/admin/roster-overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      formStatus.textContent = "Saved.";
+      e.target.reset();
+      el("ov-status").value = "out";
+      loadOverrides();
+    } catch (err) {
+      formStatus.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  // --- Models ---
+  async function loadModels() {
+    const table = el("models-table");
+    const status = el("models-status");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+    try {
+      const models = await api("/admin/models");
+      if (models.length === 0) {
+        status.textContent = "No trained model versions yet.";
+        table.style.display = "none";
+        return;
+      }
+      for (const m of models) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${m.id}</td>
+          <td>${m.through_date}</td>
+          <td>${m.created_at}</td>
+          <td>${m.is_active ? '<span class="badge active">active</span>' : ""}</td>
+          <td>${m.is_active ? "" : `<button class="secondary" data-id="${m.id}">Activate</button>`}</td>
+        `;
+        const btn = tr.querySelector("button");
+        if (btn) btn.addEventListener("click", () => activateModel(m.id));
+        tbody.appendChild(tr);
+      }
+      status.textContent = "";
+      table.style.display = "table";
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  }
+
+  async function activateModel(id) {
+    try {
+      await api(`/admin/models/${id}/activate`, { method: "POST" });
+      loadModels();
+    } catch (err) {
+      el("models-status").textContent = `Error: ${err.message}`;
+    }
+  }
+  el("models-refresh").addEventListener("click", loadModels);
+
+  // --- Prediction tracking ---
+  el("capture-predictions").addEventListener("click", async () => {
+    const status = el("tracking-status");
+    status.textContent = "Capturing...";
+    try {
+      const records = await api("/admin/predictions/capture", { method: "POST" });
+      status.textContent = `Captured/refreshed ${records.length} pending prediction(s).`;
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  el("reconcile-predictions").addEventListener("click", async () => {
+    const status = el("tracking-status");
+    status.textContent = "Reconciling...";
+    try {
+      const records = await api("/admin/predictions/reconcile", { method: "POST" });
+      status.textContent = `Reconciled ${records.length} prediction(s).`;
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  function fmt(n, digits = 3) {
+    return typeof n === "number" ? n.toFixed(digits) : "—";
+  }
+
+  async function loadAccuracy() {
+    const table = el("accuracy-table");
+    const status = el("accuracy-status");
+    const tbody = table.querySelector("tbody");
+    tbody.innerHTML = "";
+    try {
+      const report = await api("/admin/predictions/accuracy");
+      if (!report.pooled) {
+        status.textContent = "No reconciled predictions yet.";
+        table.style.display = "none";
+        return;
+      }
+      const rows = [{ model_version_id: "pooled", ...report.pooled }, ...report.by_model_version];
+      for (const r of rows) {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${r.model_version_id}</td>
+          <td>${r.n_games}</td>
+          <td>${pct(r.accuracy)}</td>
+          <td>${fmt(r.mae, 1)}</td>
+          <td>${fmt(r.rmse, 1)}</td>
+          <td>${fmt(r.brier_score)}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+      status.textContent = "";
+      table.style.display = "table";
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  }
+  el("accuracy-refresh").addEventListener("click", loadAccuracy);
+
+  // --- Admin tools ---
+  el("refresh-data").addEventListener("click", async () => {
+    const status = el("refresh-status");
+    const btn = el("refresh-data");
+    btn.disabled = true;
+    status.textContent = "Refreshing...";
+    try {
+      const result = await api("/admin/refresh-data", { method: "POST" });
+      status.textContent = `Done. Season ${result.season} refreshed.`;
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  let retrainPollHandle = null;
+
+  function pollRetrain(jobId) {
+    const status = el("retrain-status");
+    if (retrainPollHandle) clearInterval(retrainPollHandle);
+    retrainPollHandle = setInterval(async () => {
+      try {
+        const job = await api(`/admin/retrain/${jobId}`);
+        if (job.status === "running") {
+          status.textContent = `Job ${jobId}: running...`;
+        } else {
+          status.textContent = `Job ${jobId}: ${job.status}${job.error ? ` — ${job.error}` : ""}`;
+          clearInterval(retrainPollHandle);
+          retrainPollHandle = null;
+          loadModels();
+        }
+      } catch (err) {
+        status.textContent = `Error polling job: ${err.message}`;
+        clearInterval(retrainPollHandle);
+        retrainPollHandle = null;
+      }
+    }, 5000);
+  }
+
+  el("start-retrain").addEventListener("click", async () => {
+    const status = el("retrain-status");
+    try {
+      const result = await api("/admin/retrain", { method: "POST" });
+      status.textContent = `Job ${result.job_id}: running...`;
+      pollRetrain(result.job_id);
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    }
+  });
+
+  // Initial loads
+  loadOverrides();
+  loadModels();
+  loadAccuracy();
+</script>

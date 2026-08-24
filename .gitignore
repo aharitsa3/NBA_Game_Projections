@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# downloaded/cached data — reproducible from src/nba_game_projections/data/download.py
+data/raw/
+data/processed/
+
+# local roster overrides (user-specific prediction inputs)
+config/roster_overrides.json
+
+.DS_Store
