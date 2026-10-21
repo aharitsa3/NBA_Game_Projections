@@ -32,7 +32,10 @@ from nba_game_projections.app.repositories.predictions import (
     PredictionRecord,
     build_prediction_repository,
 )
-from nba_game_projections.app.services.prediction import predict_pending_games
+from nba_game_projections.app.services.prediction import (
+    predict_pending_games,
+    predict_slate_including_completed,
+)
 from nba_game_projections.backtest.report import brier_score
 from nba_game_projections.data.schedules import load_schedules
 
@@ -44,6 +47,24 @@ def capture_pending_predictions(session: Session, horizon_days: int = 14) -> lis
     version has been activated yet.
     """
     predictions = predict_pending_games(session, horizon_days=horizon_days)
+    if not predictions:
+        return []
+
+    active_model_id = build_model_version_repository(session).get_active().id
+    repository = build_prediction_repository(session)
+    return [
+        repository.upsert_prediction(model_version_id=active_model_id, **prediction)
+        for prediction in predictions
+    ]
+
+
+def capture_predictions_for_date(session: Session, date: str) -> list[PredictionRecord]:
+    """Insert/refresh a prediction row for every game on `date`, played or not.
+
+    Backfills a date whose games finished before they were captured; run
+    `reconcile_predictions` afterwards to score them.
+    """
+    predictions = predict_slate_including_completed(session, date)
     if not predictions:
         return []
 

@@ -97,6 +97,20 @@ def _upcoming_games_for_date(target_date: pd.Timestamp) -> pd.DataFrame:
     return games.loc[matches].reset_index(drop=True)
 
 
+def _completed_games_for_date(target_date: pd.Timestamp) -> pd.DataFrame:
+    """Already-played games on `target_date`, shaped like `load_upcoming_games()` output.
+
+    Lets a slate be (re)predicted after the fact - e.g. games that finished
+    before anyone captured predictions for them. The model only sees
+    strictly-earlier games (`_schedules_with_target_games` swaps the real
+    result for a placeholder), so there's no leakage from the game itself.
+    """
+    completed = load_schedules(config.season_range())
+    naive_date = completed["date"].dt.tz_localize(None)
+    games = completed.loc[naive_date.dt.date == target_date.date()]
+    return games[_UPCOMING_GAMES_COLUMNS].reset_index(drop=True)
+
+
 def _schedules_with_target_games(target_games: pd.DataFrame) -> pd.DataFrame:
     """Real completed history plus the target slate as placeholder rows.
 
@@ -192,6 +206,16 @@ def _predict_games(session: Session, target_games: pd.DataFrame) -> list[dict]:
             }
         )
     return predictions
+
+
+def predict_slate_including_completed(session: Session, date: str | pd.Timestamp) -> list[dict]:
+    """Like `predict_slate`, but also covers games on `date` that have already been played."""
+    target_date = pd.Timestamp(date)
+    games = pd.concat(
+        [_upcoming_games_for_date(target_date), _completed_games_for_date(target_date)],
+        ignore_index=True,
+    ).drop_duplicates("game_id")
+    return _predict_games(session, games)
 
 
 def predict_slate(session: Session, date: str | pd.Timestamp | None = None) -> list[dict]:
