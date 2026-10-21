@@ -16,6 +16,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
 
 from nba_game_projections import config
 
@@ -35,6 +36,8 @@ _RAW_TO_CLEAN = {
     "home_winner": "home_winner",
     "away_winner": "away_winner",
 }
+
+_SCHEDULED_STATUS = "STATUS_SCHEDULED"
 
 _CLEAN_COLUMNS = list(_RAW_TO_CLEAN.values())
 
@@ -62,8 +65,20 @@ def _load_season(season: int) -> pd.DataFrame:
             "(or `download.download_all()`) first."
         )
 
-    raw = pd.read_parquet(path, columns=list(_RAW_TO_CLEAN))
-    df = raw.rename(columns=_RAW_TO_CLEAN)[_CLEAN_COLUMNS]
+    # An in-progress season's file lists its whole schedule: unplayed games
+    # carry placeholder 0-0 scores, and until hoopR backfills them the file
+    # may have no `home_winner`/`away_winner` columns at all (see
+    # `upcoming_games.py`). Drop unplayed games; derive winners if absent.
+    has_winner_columns = "home_winner" in pq.read_schema(path).names
+    raw_columns = [c for c in _RAW_TO_CLEAN if has_winner_columns or "_winner" not in c]
+
+    raw = pd.read_parquet(path, columns=[*raw_columns, "status_type_name"])
+    raw = raw[raw["status_type_name"] != _SCHEDULED_STATUS].reset_index(drop=True)
+    if not has_winner_columns:
+        raw["home_winner"] = raw["home_score"] > raw["away_score"]
+        raw["away_winner"] = raw["away_score"] > raw["home_score"]
+
+    df = raw.rename(columns=_RAW_TO_CLEAN)[_CLEAN_COLUMNS].copy()
     df[_INT32_COLUMNS] = df[_INT32_COLUMNS].astype("int32")
     df["home_winner"] = df["home_winner"].astype(bool)
     df["away_winner"] = df["away_winner"].astype(bool)

@@ -9,6 +9,7 @@ from nba_game_projections.data import schedules
 def _raw_schedule_df(season: int, n: int = 3) -> pd.DataFrame:
     return pd.DataFrame(
         {
+            "status_type_name": ["STATUS_FINAL"] * n,
             "game_id": [400_000_000 + season * 100 + i for i in range(n)],
             "season": [season] * n,
             "season_type": [2] * n,
@@ -117,3 +118,31 @@ def test_missing_season_file_raises_actionable_error(monkeypatch, tmp_path):
     message = str(excinfo.value)
     assert "2021" in message
     assert "nba_schedule_2021.parquet" in message
+
+
+def test_load_schedules_in_progress_season_without_winner_columns(monkeypatch, tmp_path):
+    monkeypatch.setattr(schedules.config, "DATA_RAW_DIR", tmp_path)
+    raw = _raw_schedule_df(2027, n=3).drop(columns=["home_winner", "away_winner"])
+    raw["status_type_name"] = ["STATUS_FINAL", "STATUS_FINAL", "STATUS_SCHEDULED"]
+    raw["home_score"] = [110, 90, 0]
+    raw["away_score"] = [100, 95, 0]
+    dest = tmp_path / "schedules" / "nba_schedule_2027.parquet"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    raw.to_parquet(dest)
+
+    df = schedules.load_schedules(seasons=[2027])
+
+    assert len(df) == 2
+    assert df["home_winner"].tolist() == [True, False]
+    assert df["away_winner"].tolist() == [False, True]
+
+
+def test_load_schedules_drops_scheduled_games_even_with_winner_columns(monkeypatch, tmp_path):
+    monkeypatch.setattr(schedules.config, "DATA_RAW_DIR", tmp_path)
+    raw = _raw_schedule_df(2027, n=3)
+    raw["status_type_name"] = ["STATUS_FINAL", "STATUS_SCHEDULED", "STATUS_SCHEDULED"]
+    dest = tmp_path / "schedules" / "nba_schedule_2027.parquet"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    raw.to_parquet(dest)
+
+    assert len(schedules.load_schedules(seasons=[2027])) == 1

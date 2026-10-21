@@ -48,13 +48,13 @@ _retrain_jobs: dict[str, dict[str, str | None]] = {}
 def refresh_data() -> dict:
     """Refresh the current season's cached hoopR data (PRD §16).
 
-    Synchronous - `download_season_files` already skips already-cached
-    files, so this is a handful of small HTTP calls expected to take
-    seconds, unlike a retrain.
+    Synchronous - a handful of small HTTP calls expected to take seconds,
+    unlike a retrain. Forces a re-download: the in-progress season's cached
+    files are otherwise never updated after their first download.
     """
     season = config.current_season()
     downloaded = {
-        folder: [str(path) for path in download.download_season_files(folder, [season])]
+        folder: [str(path) for path in download.download_season_files(folder, [season], force=True)]
         for folder in _SEASON_FOLDERS
     }
     return {"status": "ok", "season": season, "downloaded": downloaded}
