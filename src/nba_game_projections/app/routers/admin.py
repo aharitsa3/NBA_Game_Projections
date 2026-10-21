@@ -28,6 +28,7 @@ from nba_game_projections.app.repositories.roster_overrides import (
 from nba_game_projections.app.services.prediction import NoActiveModelError
 from nba_game_projections.app.services.prediction_tracking import (
     capture_pending_predictions,
+    capture_predictions_for_date,
     compute_accuracy,
     reconcile_predictions,
 )
@@ -48,13 +49,13 @@ _retrain_jobs: dict[str, dict[str, str | None]] = {}
 def refresh_data() -> dict:
     """Refresh the current season's cached hoopR data (PRD §16).
 
-    Synchronous - `download_season_files` already skips already-cached
-    files, so this is a handful of small HTTP calls expected to take
-    seconds, unlike a retrain.
+    Synchronous - a handful of small HTTP calls expected to take seconds,
+    unlike a retrain. Forces a re-download: the in-progress season's cached
+    files are otherwise never updated after their first download.
     """
     season = config.current_season()
     downloaded = {
-        folder: [str(path) for path in download.download_season_files(folder, [season])]
+        folder: [str(path) for path in download.download_season_files(folder, [season], force=True)]
         for folder in _SEASON_FOLDERS
     }
     return {"status": "ok", "season": season, "downloaded": downloaded}
@@ -205,6 +206,11 @@ def list_predictions(session: Session = Depends(get_session)) -> list[dict]:
 @router.post("/predictions/capture")
 def capture_predictions(
     horizon_days: int = Query(14, ge=1, le=60, description="How many days ahead to capture."),
+    date: str | None = Query(
+        None,
+        description="YYYY-MM-DD. Capture just this date, including already-played games "
+        "(backfill); overrides horizon_days.",
+    ),
     session: Session = Depends(get_session),
 ) -> list[dict]:
     """Insert/refresh a prediction row for every not-yet-played game in the next `horizon_days`.
@@ -215,7 +221,11 @@ def capture_predictions(
     docstring before pushing this much higher.
     """
     try:
-        records = capture_pending_predictions(session, horizon_days=horizon_days)
+        records = (
+            capture_predictions_for_date(session, date)
+            if date
+            else capture_pending_predictions(session, horizon_days=horizon_days)
+        )
     except NoActiveModelError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     return [_serialize_prediction(record) for record in records]
